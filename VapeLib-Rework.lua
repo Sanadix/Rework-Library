@@ -172,7 +172,9 @@ local getfontsize = function(text, size, font)
 	fontsize.Text = text
 	fontsize.Size = size
 	if typeof(font) == 'Font' then
-		fontsize.Font = font
+		-- Convert Font object to enum for GetTextBoundsParams
+		local fontEnum = Enum.Font[font.Family] or Enum.Font.Arial
+		fontsize.Font = fontEnum
 	end
 	return textService:GetTextBoundsAsync(fontsize)
 end
@@ -454,7 +456,7 @@ do
 		) or uipallet.Font
 		uipallet.FontSemiBold = Font.new(uipallet.Font.Family, Enum.FontWeight.SemiBold)
 	end
-	fontsize.Font = uipallet.Font
+	fontsize.Font = Enum.Font.Arial
 end
 
 do
