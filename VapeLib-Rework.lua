@@ -6059,6 +6059,28 @@ guipane:CreateToggle({
 	Default = true,
 	Tooltip = 'Toggles visibility of these'
 })
+
+guipane:CreateToggle({
+    Name = 'Enable keyboard navigation',
+    Function = function(enabled)
+        mainapi.KeyboardNavEnabled = enabled
+        if enabled then
+            -- collect selectable GUI objects
+            mainapi._SelectableObjects = {}
+            for _, obj in ipairs(clickgui:GetDescendants()) do
+                if obj:IsA('TextButton') or obj:IsA('ImageButton') then
+                    table.insert(mainapi._SelectableObjects, obj)
+                end
+            end
+            mainapi._SelectedIndex = 1
+            updateSelectionVisual(mainapi._SelectableObjects[mainapi._SelectedIndex])
+        else
+            if selectionFrame then selectionFrame.Visible = false end
+        end
+    end,
+    Default = false,
+    Tooltip = 'Navigate the GUI with arrow keys and Enter'
+})
 guipane:CreateToggle({
 	Name = 'Show legit mode',
 	Function = function(enabled)
