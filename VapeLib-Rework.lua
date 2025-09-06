@@ -58,6 +58,43 @@ local uipallet = {
 	Tween = TweenInfo.new(0.16, Enum.EasingStyle.Linear)
 }
 
+-- Keyboard navigation state
+mainapi.KeyboardNavEnabled = false
+mainapi._SelectableObjects = mainapi._SelectableObjects or {}
+mainapi._SelectedIndex = mainapi._SelectedIndex or 1
+local selectionFrame = nil
+local function ensureSelectionFrame()
+    if selectionFrame and selectionFrame.Parent then return end
+    selectionFrame = Instance.new('Frame')
+    selectionFrame.Name = 'KeyboardSelection'
+    selectionFrame.BackgroundTransparency = 0.95
+    selectionFrame.BorderSizePixel = 2
+    selectionFrame.ZIndex = 10000
+    selectionFrame.Visible = false
+    selectionFrame.Parent = nil -- will set when GUI created
+end
+
+local function updateSelectionVisual(obj)
+    if not obj or not obj:IsA('GuiObject') then
+        if selectionFrame then selectionFrame.Visible = false end
+        return
+    end
+    if not selectionFrame or not selectionFrame.Parent then
+        ensureSelectionFrame()
+        if mainapi.gui and mainapi.gui.Parent then
+            selectionFrame.Parent = mainapi.gui
+        else
+            selectionFrame.Parent = game:GetService('Players').LocalPlayer.PlayerGui
+        end
+    end
+    local absPos = obj.AbsolutePosition
+    local absSize = obj.AbsoluteSize
+    selectionFrame.Position = UDim2.fromOffset(absPos.X, absPos.Y)
+    selectionFrame.Size = UDim2.fromOffset(absSize.X, absSize.Y)
+    selectionFrame.BorderColor3 = Color3.fromHSV(mainapi.GUIColor.Hue, mainapi.GUIColor.Sat, mainapi.GUIColor.Value)
+    selectionFrame.Visible = true
+end
+
 local getcustomassets = {
 	['newvape/assets/new/add.png'] = 'rbxassetid://14368300605',
 	['newvape/assets/new/alert.png'] = 'rbxassetid://14368301329',
@@ -2514,6 +2551,39 @@ function mainapi:CreateGUI()
 	settingsbutton.Text = ''
 	settingsbutton.Parent = window
 	addTooltip(settingsbutton, 'Open settings')
+
+	-- Keyboard navigation toggle in GUI settings area (created here for visibility)
+	-- We'll add the option to the GUI pane later to control this
+	mainapi.KeyboardNavToggle = Instance.new('TextButton')
+	mainapi.KeyboardNavToggle.Name = 'KeyboardNavToggle'
+	mainapi.KeyboardNavToggle.Size = UDim2.fromOffset(120, 26)
+	mainapi.KeyboardNavToggle.Position = UDim2.fromOffset(60, 10)
+	mainapi.KeyboardNavToggle.AutoButtonColor = true
+	mainapi.KeyboardNavToggle.Text = 'Keyboard Nav: OFF'
+	mainapi.KeyboardNavToggle.BackgroundColor3 = color.Light(uipallet.Main, 0.02)
+	mainapi.KeyboardNavToggle.Font = uipallet.Font
+	mainapi.KeyboardNavToggle.TextSize = 12
+	mainapi.KeyboardNavToggle.Visible = false
+	mainapi.KeyboardNavToggle.Parent = window
+	addCorner(mainapi.KeyboardNavToggle, UDim.new(0, 4))
+	mainapi.KeyboardNavToggle.MouseButton1Click:Connect(function()
+		mainapi.KeyboardNavEnabled = not mainapi.KeyboardNavEnabled
+		mainapi.KeyboardNavToggle.Text = 'Keyboard Nav: ' .. (mainapi.KeyboardNavEnabled and 'ON' or 'OFF')
+		-- collect selectable GUI objects when toggled on
+		if mainapi.KeyboardNavEnabled then
+			-- gather top-level clickable/selectable objects in the current clickgui
+			mainapi._SelectableObjects = {}
+			for _, obj in ipairs(clickgui:GetDescendants()) do
+				if obj:IsA('TextButton') or obj:IsA('ImageButton') then
+					table.insert(mainapi._SelectableObjects, obj)
+				end
+			end
+			mainapi._SelectedIndex = 1
+			updateSelectionVisual(mainapi._SelectableObjects[mainapi._SelectedIndex])
+		else
+			if selectionFrame then selectionFrame.Visible = false end
+		end
+	end)
 	local settingsicon = Instance.new('ImageLabel')
 	settingsicon.Size = UDim2.fromOffset(14, 14)
 	settingsicon.Position = UDim2.fromOffset(15, 12)
@@ -6949,112 +7019,10 @@ mainapi:Clean(notifications.ChildRemoved:Connect(function()
 	end
 end))
 
--- Navigation support: allow Up/Down arrows and Enter to navigate modules
-mainapi.NavList = {}
-mainapi.NavIndex = 0
-
-function mainapi:RebuildNavList()
-    local list = {}
-    local function isFullyVisible(obj)
-        local cur = obj
-        while cur and cur ~= clickgui do
-            if cur:IsA and cur:IsA('GuiObject') and cur.Visible == false then
-                return false
-            end
-            cur = cur.Parent
-        end
-        return true
-    end
-    for name, m in pairs(self.Modules) do
-        if m.Object and m.Object:IsA and m.Object:IsA('GuiObject') and m.Object.Parent then
-            -- include only if it's inside the clickgui or scaledgui hierarchy and all ancestors are visible
-            local inGui = (clickgui and m.Object:IsDescendantOf(clickgui)) or (scaledgui and m.Object:IsDescendantOf(scaledgui))
-            if inGui and isFullyVisible(m.Object) then
-                if not m.Object._origBackgroundColor then m.Object._origBackgroundColor = m.Object.BackgroundColor3 end
-                if not m.Object._origTextColor then m.Object._origTextColor = m.Object.TextColor3 end
-                table.insert(list, m)
-            end
-        end
-    end
-    table.sort(list, function(a, b)
-        if a.Category == b.Category then
-            return (a.Index or 0) < (b.Index or 0)
-        end
-        return tostring(a.Category) < tostring(b.Category)
-    end)
-    self.NavList = list
-    if #list > 0 and (self.NavIndex < 1 or self.NavIndex > #list) then
-        self.NavIndex = 1
-    end
-end
-
-local function setHoverVisual(obj, hovered)
-    pcall(function()
-        if hovered then
-            obj.BackgroundColor3 = color.Light(uipallet.Main, 0.02)
-            obj.TextColor3 = uipallet.Text
-        else
-            obj.BackgroundColor3 = obj._origBackgroundColor or uipallet.Main
-            obj.TextColor3 = obj._origTextColor or color.Dark(uipallet.Text, 0.16)
-        end
-    end)
-end
-
-function mainapi:NavMove(dir)
-    if not clickgui or not clickgui.Visible then return end
-    self:RebuildNavList()
-    if #self.NavList == 0 then return end
-    local old = self.NavIndex
-    self.NavIndex = math.clamp((self.NavIndex or 0) + dir, 1, #self.NavList)
-    if old ~= self.NavIndex then
-        local prev = self.NavList[old]
-        local cur = self.NavList[self.NavIndex]
-        if prev and prev.Object then setHoverVisual(prev.Object, false) end
-        if cur and cur.Object then
-            setHoverVisual(cur.Object, true)
-            local sframe = cur.Object.Parent
-            if sframe and sframe:IsA('ScrollingFrame') then
-                local targetY = cur.Object.AbsolutePosition.Y - sframe.AbsolutePosition.Y
-                local center = math.max(0, targetY - (sframe.AbsoluteSize.Y / 2))
-                sframe.CanvasPosition = Vector2.new(0, center)
-            end
-        end
-    end
-end
-
-function mainapi:NavActivate()
-    local cur = self.NavList[self.NavIndex]
-    if not cur then return end
-    pcall(function()
-        -- Only call Toggle if it's a function; some objects may have a non-callable Toggle field
-        if type(cur.Toggle) == 'function' then
-            pcall(cur.Toggle, cur)
-        elseif cur.Object and cur.Object:IsA('GuiButton') then
-            if type(cur.Object.Activate) == 'function' then
-                pcall(function() cur.Object:Activate() end)
-            end
-        end
-    end)
-end
-
 mainapi:Clean(inputService.InputBegan:Connect(function(inputObj)
 	if not inputService:GetFocusedTextBox() and inputObj.KeyCode ~= Enum.KeyCode.Unknown then
 		table.insert(mainapi.HeldKeybinds, inputObj.KeyCode.Name)
 		if mainapi.Binding then return end
-
-		-- Keyboard navigation (Up/Down + Enter) when GUI is visible and not binding
-		if clickgui and clickgui.Visible and not mainapi.Binding then
-			if inputObj.KeyCode == Enum.KeyCode.Up or inputObj.KeyCode == Enum.KeyCode.W then
-				mainapi:NavMove(-1)
-				return
-			elseif inputObj.KeyCode == Enum.KeyCode.Down or inputObj.KeyCode == Enum.KeyCode.S then
-				mainapi:NavMove(1)
-				return
-			elseif inputObj.KeyCode == Enum.KeyCode.Return or inputObj.KeyCode == Enum.KeyCode.KeypadEnter or inputObj.KeyCode == Enum.KeyCode.E then
-				mainapi:NavActivate()
-				return
-			end
-		end
 
 		if checkKeybinds(mainapi.HeldKeybinds, mainapi.Keybind, inputObj.KeyCode.Name) then
 			if mainapi.ThreadFix then
@@ -7064,20 +7032,6 @@ mainapi:Clean(inputService.InputBegan:Connect(function(inputObj)
 				v.Visible = false
 			end
 			clickgui.Visible = not clickgui.Visible
-			-- rebuild navigation list and highlight first item when opening GUI
-			if clickgui.Visible then
-				mainapi:RebuildNavList()
-				if mainapi.NavList and #mainapi.NavList > 0 then
-					mainapi.NavIndex = math.clamp(mainapi.NavIndex or 1, 1, #mainapi.NavList)
-					local cur = mainapi.NavList[mainapi.NavIndex]
-					if cur and cur.Object then
-						setHoverVisual(cur.Object, true)
-					end
-				end
-			else
-				-- clear hover visuals when closing
-				for _, m in pairs(mainapi.NavList or {}) do if m.Object then setHoverVisual(m.Object, false) end end
-			end
 			tooltip.Visible = false
 			mainapi:BlurCheck()
 		end
