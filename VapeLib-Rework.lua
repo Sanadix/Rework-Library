@@ -7026,11 +7026,12 @@ function mainapi:NavActivate()
     local cur = self.NavList[self.NavIndex]
     if not cur then return end
     pcall(function()
-        if cur.Toggle then
-            cur:Toggle()
+        -- Only call Toggle if it's a function; some objects may have a non-callable Toggle field
+        if type(cur.Toggle) == 'function' then
+            pcall(cur.Toggle, cur)
         elseif cur.Object and cur.Object:IsA('GuiButton') then
-            if cur.Object.Activate then
-                cur.Object:Activate()
+            if type(cur.Object.Activate) == 'function' then
+                pcall(function() cur.Object:Activate() end)
             end
         end
     end)
