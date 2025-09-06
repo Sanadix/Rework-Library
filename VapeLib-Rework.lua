@@ -6955,11 +6955,25 @@ mainapi.NavIndex = 0
 
 function mainapi:RebuildNavList()
     local list = {}
+    local function isFullyVisible(obj)
+        local cur = obj
+        while cur and cur ~= clickgui do
+            if cur:IsA and cur:IsA('GuiObject') and cur.Visible == false then
+                return false
+            end
+            cur = cur.Parent
+        end
+        return true
+    end
     for name, m in pairs(self.Modules) do
-        if m.Object and m.Object:IsA('GuiObject') and m.Object.Parent and m.Object.Visible then
-            if not m.Object._origBackgroundColor then m.Object._origBackgroundColor = m.Object.BackgroundColor3 end
-            if not m.Object._origTextColor then m.Object._origTextColor = m.Object.TextColor3 end
-            table.insert(list, m)
+        if m.Object and m.Object:IsA and m.Object:IsA('GuiObject') and m.Object.Parent then
+            -- include only if it's inside the clickgui or scaledgui hierarchy and all ancestors are visible
+            local inGui = (clickgui and m.Object:IsDescendantOf(clickgui)) or (scaledgui and m.Object:IsDescendantOf(scaledgui))
+            if inGui and isFullyVisible(m.Object) then
+                if not m.Object._origBackgroundColor then m.Object._origBackgroundColor = m.Object.BackgroundColor3 end
+                if not m.Object._origTextColor then m.Object._origTextColor = m.Object.TextColor3 end
+                table.insert(list, m)
+            end
         end
     end
     table.sort(list, function(a, b)
@@ -7029,13 +7043,13 @@ mainapi:Clean(inputService.InputBegan:Connect(function(inputObj)
 
 		-- Keyboard navigation (Up/Down + Enter) when GUI is visible and not binding
 		if clickgui and clickgui.Visible and not mainapi.Binding then
-			if inputObj.KeyCode == Enum.KeyCode.Up then
+			if inputObj.KeyCode == Enum.KeyCode.Up or inputObj.KeyCode == Enum.KeyCode.W then
 				mainapi:NavMove(-1)
 				return
-			elseif inputObj.KeyCode == Enum.KeyCode.Down then
+			elseif inputObj.KeyCode == Enum.KeyCode.Down or inputObj.KeyCode == Enum.KeyCode.S then
 				mainapi:NavMove(1)
 				return
-			elseif inputObj.KeyCode == Enum.KeyCode.Return or inputObj.KeyCode == Enum.KeyCode.KeypadEnter then
+			elseif inputObj.KeyCode == Enum.KeyCode.Return or inputObj.KeyCode == Enum.KeyCode.KeypadEnter or inputObj.KeyCode == Enum.KeyCode.E then
 				mainapi:NavActivate()
 				return
 			end
@@ -7049,6 +7063,20 @@ mainapi:Clean(inputService.InputBegan:Connect(function(inputObj)
 				v.Visible = false
 			end
 			clickgui.Visible = not clickgui.Visible
+			-- rebuild navigation list and highlight first item when opening GUI
+			if clickgui.Visible then
+				mainapi:RebuildNavList()
+				if mainapi.NavList and #mainapi.NavList > 0 then
+					mainapi.NavIndex = math.clamp(mainapi.NavIndex or 1, 1, #mainapi.NavList)
+					local cur = mainapi.NavList[mainapi.NavIndex]
+					if cur and cur.Object then
+						setHoverVisual(cur.Object, true)
+					end
+				end
+			else
+				-- clear hover visuals when closing
+				for _, m in pairs(mainapi.NavList or {}) do if m.Object then setHoverVisual(m.Object, false) end end
+			end
 			tooltip.Visible = false
 			mainapi:BlurCheck()
 		end
