@@ -7082,6 +7082,37 @@ mainapi:Clean(inputService.InputBegan:Connect(function(inputObj)
 	end
 end))
 
+-- Keyboard nav handler (separate so it doesn't interfere with existing keybind logic)
+mainapi:Clean(inputService.InputBegan:Connect(function(inputObj, gameProcessed)
+    if not mainapi.KeyboardNavEnabled then return end
+    if gameProcessed then return end
+    if inputService:GetFocusedTextBox() then return end
+    local key = inputObj.KeyCode
+    if key == Enum.KeyCode.Up then
+        mainapi._SelectedIndex = math.max(1, (mainapi._SelectedIndex or 1) - 1)
+        updateSelectionVisual(mainapi._SelectableObjects[mainapi._SelectedIndex])
+    elseif key == Enum.KeyCode.Down then
+        mainapi._SelectedIndex = math.min(#mainapi._SelectableObjects, (mainapi._SelectedIndex or 1) + 1)
+        updateSelectionVisual(mainapi._SelectableObjects[mainapi._SelectedIndex])
+    elseif key == Enum.KeyCode.Left then
+        mainapi._SelectedIndex = math.max(1, (mainapi._SelectedIndex or 1) - 1)
+        updateSelectionVisual(mainapi._SelectableObjects[mainapi._SelectedIndex])
+    elseif key == Enum.KeyCode.Right then
+        mainapi._SelectedIndex = math.min(#mainapi._SelectableObjects, (mainapi._SelectedIndex or 1) + 1)
+        updateSelectionVisual(mainapi._SelectableObjects[mainapi._SelectedIndex])
+    elseif key == Enum.KeyCode.Return or key == Enum.KeyCode.KeypadEnter then
+        local obj = mainapi._SelectableObjects[mainapi._SelectedIndex]
+        if obj and obj:IsA('GuiButton') then
+            pcall(function() obj:Activate() end)
+        elseif obj and obj:IsA('TextButton') then
+            pcall(function()
+                obj:CaptureFocus()
+                obj.MouseButton1Click:Fire()
+            end)
+        end
+    end
+end))
+
 mainapi:Clean(inputService.InputEnded:Connect(function(inputObj)
 	if not inputService:GetFocusedTextBox() and inputObj.KeyCode ~= Enum.KeyCode.Unknown then
 		if mainapi.Binding then
