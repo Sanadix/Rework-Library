@@ -2561,7 +2561,7 @@ function mainapi:CreateGUI()
 	mainapi.KeyboardNavToggle.AutoButtonColor = true
 	mainapi.KeyboardNavToggle.Text = 'Keyboard Nav: OFF'
 	mainapi.KeyboardNavToggle.BackgroundColor3 = color.Light(uipallet.Main, 0.02)
-	mainapi.KeyboardNavToggle.Font = uipallet.Font
+	mainapi.KeyboardNavToggle.FontFace = uipallet.Font
 	mainapi.KeyboardNavToggle.TextSize = 12
 	mainapi.KeyboardNavToggle.Visible = false
 	mainapi.KeyboardNavToggle.Parent = window
