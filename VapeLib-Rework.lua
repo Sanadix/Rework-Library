@@ -58,43 +58,6 @@ local uipallet = {
 	Tween = TweenInfo.new(0.16, Enum.EasingStyle.Linear)
 }
 
--- Keyboard navigation state
-mainapi.KeyboardNavEnabled = false
-mainapi._SelectableObjects = mainapi._SelectableObjects or {}
-mainapi._SelectedIndex = mainapi._SelectedIndex or 1
-local selectionFrame = nil
-local function ensureSelectionFrame()
-    if selectionFrame and selectionFrame.Parent then return end
-    selectionFrame = Instance.new('Frame')
-    selectionFrame.Name = 'KeyboardSelection'
-    selectionFrame.BackgroundTransparency = 0.95
-    selectionFrame.BorderSizePixel = 2
-    selectionFrame.ZIndex = 10000
-    selectionFrame.Visible = false
-    selectionFrame.Parent = nil -- will set when GUI created
-end
-
-local function updateSelectionVisual(obj)
-    if not obj or not obj:IsA('GuiObject') then
-        if selectionFrame then selectionFrame.Visible = false end
-        return
-    end
-    if not selectionFrame or not selectionFrame.Parent then
-        ensureSelectionFrame()
-        if mainapi.gui and mainapi.gui.Parent then
-            selectionFrame.Parent = mainapi.gui
-        else
-            selectionFrame.Parent = game:GetService('Players').LocalPlayer.PlayerGui
-        end
-    end
-    local absPos = obj.AbsolutePosition
-    local absSize = obj.AbsoluteSize
-    selectionFrame.Position = UDim2.fromOffset(absPos.X, absPos.Y)
-    selectionFrame.Size = UDim2.fromOffset(absSize.X, absSize.Y)
-    selectionFrame.BorderColor3 = Color3.fromHSV(mainapi.GUIColor.Hue, mainapi.GUIColor.Sat, mainapi.GUIColor.Value)
-    selectionFrame.Visible = true
-end
-
 local getcustomassets = {
 	['newvape/assets/new/add.png'] = 'rbxassetid://14368300605',
 	['newvape/assets/new/alert.png'] = 'rbxassetid://14368301329',
@@ -172,9 +135,7 @@ local getfontsize = function(text, size, font)
 	fontsize.Text = text
 	fontsize.Size = size
 	if typeof(font) == 'Font' then
-		-- Convert Font object to enum for GetTextBoundsParams
-		local fontEnum = Enum.Font[font.Family] or Enum.Font.Arial
-		fontsize.Font = fontEnum
+		fontsize.Font = font
 	end
 	return textService:GetTextBoundsAsync(fontsize)
 end
@@ -456,7 +417,7 @@ do
 		) or uipallet.Font
 		uipallet.FontSemiBold = Font.new(uipallet.Font.Family, Enum.FontWeight.SemiBold)
 	end
-	fontsize.Font = Enum.Font.Arial
+	fontsize.Font = uipallet.Font
 end
 
 do
@@ -2553,39 +2514,6 @@ function mainapi:CreateGUI()
 	settingsbutton.Text = ''
 	settingsbutton.Parent = window
 	addTooltip(settingsbutton, 'Open settings')
-
-	-- Keyboard navigation toggle in GUI settings area (created here for visibility)
-	-- We'll add the option to the GUI pane later to control this
-	mainapi.KeyboardNavToggle = Instance.new('TextButton')
-	mainapi.KeyboardNavToggle.Name = 'KeyboardNavToggle'
-	mainapi.KeyboardNavToggle.Size = UDim2.fromOffset(120, 26)
-	mainapi.KeyboardNavToggle.Position = UDim2.fromOffset(60, 10)
-	mainapi.KeyboardNavToggle.AutoButtonColor = true
-	mainapi.KeyboardNavToggle.Text = 'Keyboard Nav: OFF'
-	mainapi.KeyboardNavToggle.BackgroundColor3 = color.Light(uipallet.Main, 0.02)
-	mainapi.KeyboardNavToggle.FontFace = uipallet.Font
-	mainapi.KeyboardNavToggle.TextSize = 12
-	mainapi.KeyboardNavToggle.Visible = false
-	mainapi.KeyboardNavToggle.Parent = window
-	addCorner(mainapi.KeyboardNavToggle, UDim.new(0, 4))
-	mainapi.KeyboardNavToggle.MouseButton1Click:Connect(function()
-		mainapi.KeyboardNavEnabled = not mainapi.KeyboardNavEnabled
-		mainapi.KeyboardNavToggle.Text = 'Keyboard Nav: ' .. (mainapi.KeyboardNavEnabled and 'ON' or 'OFF')
-		-- collect selectable GUI objects when toggled on
-		if mainapi.KeyboardNavEnabled then
-			-- gather top-level clickable/selectable objects in the current clickgui
-			mainapi._SelectableObjects = {}
-			for _, obj in ipairs(clickgui:GetDescendants()) do
-				if obj:IsA('TextButton') or obj:IsA('ImageButton') then
-					table.insert(mainapi._SelectableObjects, obj)
-				end
-			end
-			mainapi._SelectedIndex = 1
-			updateSelectionVisual(mainapi._SelectableObjects[mainapi._SelectedIndex])
-		else
-			if selectionFrame then selectionFrame.Visible = false end
-		end
-	end)
 	local settingsicon = Instance.new('ImageLabel')
 	settingsicon.Size = UDim2.fromOffset(14, 14)
 	settingsicon.Position = UDim2.fromOffset(15, 12)
@@ -6061,27 +5989,13 @@ guipane:CreateToggle({
 	Default = true,
 	Tooltip = 'Toggles visibility of these'
 })
-
-guipane:CreateToggle({
-    Name = 'Enable keyboard navigation',
-    Function = function(enabled)
-        mainapi.KeyboardNavEnabled = enabled
-        if enabled then
-            -- collect selectable GUI objects
-            mainapi._SelectableObjects = {}
-            for _, obj in ipairs(clickgui:GetDescendants()) do
-                if obj:IsA('TextButton') or obj:IsA('ImageButton') then
-                    table.insert(mainapi._SelectableObjects, obj)
-                end
-            end
-            mainapi._SelectedIndex = 1
-            updateSelectionVisual(mainapi._SelectableObjects[mainapi._SelectedIndex])
-        else
-            if selectionFrame then selectionFrame.Visible = false end
-        end
-    end,
-    Default = false,
-    Tooltip = 'Navigate the GUI with arrow keys and Enter'
+mainapi.KeyboardNavigation = guipane:CreateToggle({
+	Name = 'Keyboard navigation',
+	Function = function(enabled)
+		-- This will be handled by the navigation system
+	end,
+	Default = true,
+	Tooltip = 'Enable keyboard navigation with arrow keys and Enter'
 })
 guipane:CreateToggle({
 	Name = 'Show legit mode',
@@ -6499,7 +6413,7 @@ VapeLabelCustom.BorderSizePixel = 0
 VapeLabelCustom.Visible = false
 VapeLabelCustom.Text = ''
 VapeLabelCustom.TextSize = 25
-pcall(function() VapeLabelCustom.FontFace = textguifontcustom.Value end)
+VapeLabelCustom.FontFace = textguifontcustom.Value
 VapeLabelCustom.RichText = true
 local VapeLabelCustomShadow = VapeLabelCustom:Clone()
 VapeLabelCustom:GetPropertyChangedSignal('Position'):Connect(function()
@@ -6796,7 +6710,7 @@ function mainapi:UpdateTextGUI(afterload)
 		VapeLogo.Position = right and UDim2.new(1 / VapeTextScale.Scale, -113, 0, 6) or UDim2.fromOffset(0, 6)
 		VapeLogoShadow.Visible = textguishadow.Enabled
 		VapeLabelCustom.Text = textguibox.Value
-		pcall(function() VapeLabelCustom.FontFace = textguifontcustom.Value end)
+		VapeLabelCustom.FontFace = textguifontcustom.Value
 		VapeLabelCustom.Visible = VapeLabelCustom.Text ~= '' and textguitext.Enabled
 		VapeLabelCustomShadow.Visible = VapeLabelCustom.Visible and textguishadow.Enabled
 		VapeLabelSorter.HorizontalAlignment = right and Enum.HorizontalAlignment.Right or Enum.HorizontalAlignment.Left
@@ -6860,7 +6774,7 @@ function mainapi:UpdateTextGUI(afterload)
 				holdertext.BorderSizePixel = 0
 				holdertext.Text = i..(v.ExtraText and " <font color='#A8A8A8'>"..v.ExtraText()..'</font>' or '')
 				holdertext.TextSize = 15
-				pcall(function() holdertext.FontFace = textguifont.Value end)
+				holdertext.FontFace = textguifont.Value
 				holdertext.RichText = true
 				local size = getfontsize(removeTags(holdertext.Text), holdertext.TextSize, holdertext.FontFace)
 				holdertext.Size = UDim2.fromOffset(size.X, size.Y)
@@ -7082,37 +6996,6 @@ mainapi:Clean(inputService.InputBegan:Connect(function(inputObj)
 			end
 		end
 	end
-end))
-
--- Keyboard nav handler (separate so it doesn't interfere with existing keybind logic)
-mainapi:Clean(inputService.InputBegan:Connect(function(inputObj, gameProcessed)
-    if not mainapi.KeyboardNavEnabled then return end
-    if gameProcessed then return end
-    if inputService:GetFocusedTextBox() then return end
-    local key = inputObj.KeyCode
-    if key == Enum.KeyCode.Up then
-        mainapi._SelectedIndex = math.max(1, (mainapi._SelectedIndex or 1) - 1)
-        updateSelectionVisual(mainapi._SelectableObjects[mainapi._SelectedIndex])
-    elseif key == Enum.KeyCode.Down then
-        mainapi._SelectedIndex = math.min(#mainapi._SelectableObjects, (mainapi._SelectedIndex or 1) + 1)
-        updateSelectionVisual(mainapi._SelectableObjects[mainapi._SelectedIndex])
-    elseif key == Enum.KeyCode.Left then
-        mainapi._SelectedIndex = math.max(1, (mainapi._SelectedIndex or 1) - 1)
-        updateSelectionVisual(mainapi._SelectableObjects[mainapi._SelectedIndex])
-    elseif key == Enum.KeyCode.Right then
-        mainapi._SelectedIndex = math.min(#mainapi._SelectableObjects, (mainapi._SelectedIndex or 1) + 1)
-        updateSelectionVisual(mainapi._SelectableObjects[mainapi._SelectedIndex])
-    elseif key == Enum.KeyCode.Return or key == Enum.KeyCode.KeypadEnter then
-        local obj = mainapi._SelectableObjects[mainapi._SelectedIndex]
-        if obj and obj:IsA('GuiButton') then
-            pcall(function() obj:Activate() end)
-        elseif obj and obj:IsA('TextButton') then
-            pcall(function()
-                obj:CaptureFocus()
-                obj.MouseButton1Click:Fire()
-            end)
-        end
-    end
 end))
 
 mainapi:Clean(inputService.InputEnded:Connect(function(inputObj)
