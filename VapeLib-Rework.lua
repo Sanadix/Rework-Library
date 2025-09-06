@@ -172,7 +172,7 @@ local getfontsize = function(text, size, font)
 	fontsize.Text = text
 	fontsize.Size = size
 	if typeof(font) == 'Font' then
-		fontsize.FontFace = font
+		fontsize.Font = font
 	end
 	return textService:GetTextBoundsAsync(fontsize)
 end
@@ -454,7 +454,7 @@ do
 		) or uipallet.Font
 		uipallet.FontSemiBold = Font.new(uipallet.Font.Family, Enum.FontWeight.SemiBold)
 	end
-	fontsize.FontFace = uipallet.Font
+	fontsize.Font = uipallet.Font
 end
 
 do
