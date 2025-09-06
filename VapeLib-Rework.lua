@@ -172,7 +172,7 @@ local getfontsize = function(text, size, font)
 	fontsize.Text = text
 	fontsize.Size = size
 	if typeof(font) == 'Font' then
-		fontsize.Font = font
+		fontsize.FontFace = font
 	end
 	return textService:GetTextBoundsAsync(fontsize)
 end
