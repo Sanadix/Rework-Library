@@ -454,7 +454,7 @@ do
 		) or uipallet.Font
 		uipallet.FontSemiBold = Font.new(uipallet.Font.Family, Enum.FontWeight.SemiBold)
 	end
-	fontsize.Font = uipallet.Font
+	fontsize.FontFace = uipallet.Font
 end
 
 do
