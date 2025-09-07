@@ -1,4 +1,3 @@
-
 --!nocheck
 --!nolint UnknownGlobal
 --[[
@@ -313,6 +312,11 @@ local Library = {
 
 		-- Global throttle for Render (seconds). 0 = no throttle (default)
 		UpdateRate = 0,
+		-- Text rendering options
+		UseStroke = false, -- add UIStroke on label
+		TextStroke = false, -- TextStrokeTransparency = 0 if true else 1
+		RichText = false,
+		Wrapped = false,
 
 		Font = Enum.Font.RobotoCondensed
 	},
@@ -607,10 +611,10 @@ function Library:Add(espSettings: ESPSettings)
 
 		Size = UDim2.new(0, 200, 0, 50),
 		Font = Library.GlobalConfig.Font,
-		TextWrap = true,
-		TextWrapped = true,
-		RichText = true,
-		TextStrokeTransparency = 0,
+		-- TextWrap removed intentionally
+		TextWrapped = Library.GlobalConfig.Wrapped,
+		RichText = Library.GlobalConfig.RichText,
+		TextStrokeTransparency = (Library.GlobalConfig.TextStroke and 0 or 1),
 		BackgroundTransparency = 1,
 
 		-- // Settings // --
@@ -619,9 +623,11 @@ function Library:Add(espSettings: ESPSettings)
 		TextSize = ESP.CurrentSettings.TextSize or 16,
 	})
 
-	InstancesLib.Create("UIStroke", {
-		Parent = BillboardText
-	})
+	if Library.GlobalConfig.UseStroke then
+		InstancesLib.Create("UIStroke", {
+			Parent = BillboardText
+		})
+	end
 
 	-- // Create Highlighter // --
 	local Highlighter, IsAdornment = nil, not not string.match(string.lower(ESP.OriginalSettings.ESPType), "adornment")
