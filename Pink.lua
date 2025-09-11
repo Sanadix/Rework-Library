@@ -74,7 +74,46 @@ local library = {
         ['colortrans'] = 'https://raw.githubusercontent.com/portallol/luna/main/modules/trans.png';
     };
     numberStrings = {['Zero'] = 0, ['One'] = 1, ['Two'] = 2, ['Three'] = 3, ['Four'] = 4, ['Five'] = 5, ['Six'] = 6, ['Seven'] = 7, ['Eight'] = 8, ['Nine'] = 9};
-    signal = loadstring(game:HttpGet('https://raw.githubusercontent.com/Quenty/NevermoreEngine/main/src/signal/src/Shared/Signal.lua'))();
+    signal = (function()
+        -- Implémentation simple d'un signal pour éviter HttpGet
+        local Signal = {}
+        Signal.__index = Signal
+        
+        function Signal.new()
+            local self = setmetatable({}, Signal)
+            self._connections = {}
+            return self
+        end
+        
+        function Signal:Connect(callback)
+            local connection = {}
+            connection.Connected = true
+            connection.Callback = callback
+            connection.Disconnect = function()
+                connection.Connected = false
+                for i, conn in ipairs(self._connections) do
+                    if conn == connection then
+                        table.remove(self._connections, i)
+                        break
+                    end
+                end
+            end
+            table.insert(self._connections, connection)
+            return connection
+        end
+        
+        function Signal:Fire(...)
+            for _, connection in ipairs(self._connections) do
+                if connection.Connected then
+                    spawn(function()
+                        connection.Callback(...)
+                    end)
+                end
+            end
+        end
+        
+        return Signal
+    end)();
     open = false;
     opening = false;
     hasInit = false;
